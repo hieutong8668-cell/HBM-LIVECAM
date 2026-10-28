@@ -6,7 +6,7 @@ Bل؛£n ل»©ng dل»¥ng Windows ؤ‘ل»™c lل؛­p, chل»چn GPU CUDA c
 
 Giل؛£i nأ©n gأ³i, chل؛،y Install-HBM-LIVECAM.cmd. Bل»™ cأ i tأ¬m Python 3.12 hل»£p lل»‡ trأھn mأ،y; chل»‰ tل؛£i bل؛£n chأ­nh thل»©c nل؛؟u khأ´ng cأ³. Bل»™ xل»­ lأ½ chأ­nh dأ¹ng ONNX Runtime CUDA 13 vأ  thئ° viل»‡n CUDA/cuDNN runtime cل؛§n thiل؛؟t; khأ´ng cأ i PyTorch/TorchVision mل؛·c ؤ‘ل»‹nh ؤ‘ل»ƒ giل؛£m tل؛£i. PyTorch chل»‰ ؤ‘ئ°ل»£c dأ¹ng cho mل»™t sل»‘ tل»‘i ئ°u phل»¥ trل»£; thiل؛؟u nأ³, phل؛§n ghأ©p ل؛£nh dأ¹ng ؤ‘ئ°ل»‌ng xل»­ lأ½ dل»± phأ²ng. Bل»™ cأ i kiل»ƒm tra CUDA trئ°ل»›c khi tل؛،o lل»‘i tل؛¯t. Khأ´ng cل؛§n cأ i CUDA Toolkit riأھng.
 
-InsightFace 0.7.3 ؤ‘ئ°ل»£c phأ،t hأ nh dئ°ل»›i dل؛،ng mأ£ nguل»“n trأھn PyPI. Nل؛؟u mأ،y khأ´ng cأ³ Microsoft C++ Build Tools, bئ°ل»›c biأھn dل»‹ch thئ° viل»‡n nأ y cأ³ thل»ƒ dل»«ng vأ  sل؛½ bأ،o lل»—i thay vأ¬ أ¢m thل؛§m chuyل»ƒn sang CPU.
+InsightFace 0.7.3 can build from source and requires Microsoft C++ Build Tools if no wheel is available.
 
 ## Camera vأ  OBS
 
@@ -21,4 +21,5 @@ Khأ´ng kأ¨m model weights. Lل؛§n ؤ‘ل؛§u xل»­ lأ½, ل»©ng dل
 ## Nguل»“n vأ  giل؛¥y phأ©p
 
 Phل؛§n lأµi dل»±a trأھn [Deep-Live-Cam](https://github.com/hacksider/Deep-Live-Cam), giل؛¥y phأ©p AGPL-3.0; toأ n vؤƒn ل»ں LICENSE. Cأ،c thay ؤ‘ل»•i cل»§a gأ³i nأ y gل»“m tأھn/metadata, bل»™ cأ i CUDA hiل»‡n hأ nh, launcher riأھng vأ  tأ i liل»‡u cأ i ؤ‘ل؛·t. Phأ¢n phل»‘i bل؛£n sل»­a ؤ‘ل»•i cل؛§n tuأ¢n thل»§ AGPL-3.0, bao gل»“m cung cل؛¥p mأ£ nguل»“n tئ°ئ،ng ل»©ng.
+
 
