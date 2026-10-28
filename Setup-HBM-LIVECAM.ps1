@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
 $appRoot = Join-Path $env:LOCALAPPDATA 'Programs\HBM-LIVECAM'
 $runtimeRoot = Join-Path $appRoot 'python'
@@ -81,18 +82,37 @@ try {
             New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
             Get-ChildItem -LiteralPath $sourceRuntime -Force | Copy-Item -Destination $runtimeRoot -Recurse -Force
         } else {
-            Say 'T?i Python 3.12.10 ch?nh th?c'
-            Invoke-WebRequest -Uri $pythonUrl -OutFile $installer
+            $localInstaller = Join-Path $PSScriptRoot 'python-3.12.10-amd64.exe'
+            if (Test-Path -LiteralPath $localInstaller) {
+                Say 'Dung bo cai Python 3.12.10 co san trong goi'
+                $installer = $localInstaller
+            } else {
+                Say 'Tai Python 3.12.10 chinh thuc'
+                $downloaded = $false
+                for ($i = 0; $i -lt 3 -and -not $downloaded; $i++) {
+                    try {
+                        Invoke-WebRequest -Uri $pythonUrl -OutFile $installer -UseBasicParsing
+                        $downloaded = $true
+                    } catch {
+                        Start-Sleep -Seconds 3
+                    }
+                }
+                if (-not $downloaded) { Fail 'Khong tai duoc Python 3.12.10. Hay dat file python-3.12.10-amd64.exe vao thu muc goi va chay lai.' }
+            }
             $sig = Get-AuthenticodeSignature -FilePath $installer
             if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
                 Fail 'Ch? k? nhà ph?t hành Python không h?p l?.'
             }
-            $pyInstallArgs = '/quiet InstallAllUsers=0 "TargetDir={0}" PrependPath=0 Include_launcher=0 Include_test=0 Include_pip=1 Include_tcltk=1 Shortcuts=0' -f $runtimeRoot
+            $pyInstallArgs = @('/quiet','InstallAllUsers=0',"TargetDir=$runtimeRoot",'PrependPath=0','Include_launcher=0','Include_test=0','Include_pip=1','Include_tcltk=1','Shortcuts=0')
             $p = Start-Process -FilePath $installer -ArgumentList $pyInstallArgs -Wait -PassThru
             if ($p.ExitCode -ne 0) { Fail "Python installer tho?t v?i m? $($p.ExitCode)." }
         }
     }
-    if (-not (Test-Path -LiteralPath $python)) { Fail 'Không t?m th?y Python riêng c?a ?ng d?ng.' }
+    if (-not (Test-Path -LiteralPath $python)) {
+        $found = Get-ChildItem -LiteralPath $runtimeRoot -Filter python.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { $python = $found.FullName }
+    }
+    if (-not (Test-Path -LiteralPath $python)) { Fail 'Khong tim thay Python rieng cua ung dung.' }
     $runtimeProbe = @(& $python -c $probeCode 2>$null) -join ''
     if ($LASTEXITCODE -ne 0 -or $runtimeProbe -notmatch '^3\.12\|') {
         Fail 'Python riêng ch?a ?? Python 3.12, pip và Tcl/Tk; ch?a ch?y ti?p cài th? vi?n.'
