@@ -1,0 +1,12 @@
+Upstream project: Deep-Live-Cam
+Repository: https://github.com/hacksider/Deep-Live-Cam
+Source license: GNU Affero General Public License v3.0 (AGPL-3.0)
+License text: LICENSE
+
+This package keeps the upstream source and attribution. Local changes:
+- Application metadata changed to HBM AI Current 1.0.0.
+- Added a Windows setup script for a private Python environment and CUDA 13 package stack.
+- Added Windows install/run launchers and Vietnamese setup notes.
+- Removed upstream promotional media files from this package.
+
+The model weights are not included. Their terms are separate from the source-code license.

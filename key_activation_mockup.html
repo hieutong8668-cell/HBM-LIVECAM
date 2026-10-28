@@ -1,0 +1,43 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>HBM-LIVECAM - Kích hoạt</title>
+<style>
+body { margin:0; font-family:"Segoe UI",Arial,sans-serif; background:#0b1020; color:#e5e7eb; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+.card { width:520px; background:#111827; border:1px solid #1f2937; border-radius:16px; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+h2 { margin:0 0 18px; color:#93c5fd; }
+.row { display:grid; grid-template-columns:110px 1fr auto; gap:10px; align-items:center; margin-bottom:12px; }
+label { color:#9ca3af; font-size:13px; }
+input { background:#0f172a; border:1px solid #334155; border-radius:8px; padding:9px 12px; color:#e5e7eb; }
+button { background:#4f46e5; color:#fff; border:none; border-radius:8px; padding:9px 16px; font-weight:600; cursor:pointer; }
+button:hover { background:#6366f1; }
+.notice { margin-top:12px; color:#fca5a5; font-size:12px; }
+.status { margin-top:14px; color:#9ca3af; font-style:italic; font-size:13px; }
+.device { background:#0f172a; border:1px solid #334155; border-radius:8px; padding:9px 12px; font-family:monospace; }
+.logo { width:48px; height:48px; margin-bottom:12px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <svg class="logo" viewBox="0 0 256 256"><rect x="16" y="16" width="224" height="224" rx="48" fill="#0b1020"/><circle cx="128" cy="128" r="74" fill="url(#g)"/><circle cx="128" cy="128" r="14" fill="#e5e7eb"/></svg>
+    <h2>Kích hoạt HBM-LIVECAM</h2>
+    <div class="row">
+      <label>Device ID</label>
+      <div class="device">HBM-A8338CF980807021</div>
+      <button onclick="copyId()">Copy</button>
+    </div>
+    <div class="row">
+      <label>License Key</label>
+      <input id="key" placeholder="HBM-XXXXX-XXXXX-XXXXX-XXXXX" />
+      <button onclick="activate()">Activate</button>
+    </div>
+    <div class="status" id="status">Chưa kích hoạt</div>
+  <div class="notice">HBM khuyến cáo không sử dụng vào những việc phi pháp, miễn trừ trách nhiệm.</div>
+  </div>
+<script>
+function copyId(){ navigator.clipboard.writeText("HBM-A8338CF980807021"); }
+function activate(){ document.getElementById("status").textContent = "Đang kiểm tra key..."; setTimeout(()=>{ document.getElementById("status").textContent="Kích hoạt thành công"; },800); }
+</script>
+</body>
+</html>

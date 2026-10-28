@@ -1,0 +1,28 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Heavy/binary
+FM-OFS-V2.2.2/
+support-cache/
+support-manifest.json
+*.whl
+*.part
+*.zip
+
+# Build
+secure_build/
+*.egg-info/
+
+# Runtime
+license.json
+issued_licenses.json
+host_profile.json
+
+# OS
+.DS_Store
+Thumbs.db

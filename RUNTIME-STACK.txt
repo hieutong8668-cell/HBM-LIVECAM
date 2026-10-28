@@ -1,0 +1,6 @@
+Target: Windows x64
+Python: 3.12.10 (private runtime; chosen because InsightFace 0.7.3 has no PyPI wheel)
+ONNX Runtime GPU: 1.30.0 (CUDA 13.0 / cuDNN 9, runtime DLLs via pip extras)
+PyTorch/TorchVision: not installed by default; optional acceleration only
+NVIDIA driver: installed separately by the GPU vendor; setup does not replace it
+ONNX Runtime CUDA compatibility: https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html
