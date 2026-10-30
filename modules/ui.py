@@ -38,12 +38,14 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -89,8 +91,8 @@ import json
 
 # --- constants ------------------------------------------------------------
 
-ROOT_HEIGHT = 820
-ROOT_WIDTH = 640
+ROOT_HEIGHT = 640
+ROOT_WIDTH = 600
 
 PREVIEW_MAX_HEIGHT = 700
 PREVIEW_MAX_WIDTH = 1200
@@ -108,71 +110,76 @@ POPUP_LIVE_SCROLL_WIDTH = 870
 POPUP_LIVE_SCROLL_HEIGHT = 700
 
 MAPPER_PREVIEW_SIZE = 100
-SOURCE_TARGET_PREVIEW_SIZE = 200
+SOURCE_TARGET_PREVIEW_SIZE = 110
 
 
 # --- modern dark stylesheet -----------------------------------------------
 
 QSS = """
 QMainWindow, QDialog {
-    background-color: #0b1020;
+    background-color: #070b16;
     color: #e5e7eb;
 }
 QWidget {
     color: #e5e7eb;
     font-family: "Segoe UI Variable", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-    font-size: 11pt;
+    font-size: 9.5pt;
+}
+QWidget#appRoot, QScrollArea#appScroll, QScrollArea#appScroll > QWidget > QWidget {
+    background-color: #070b16;
 }
 
 QGroupBox {
-    background-color: #111827;
-    border: 1px solid #1f2937;
-    border-radius: 14px;
-    margin-top: 16px;
-    padding: 18px 14px 14px 14px;
-    font-weight: 600;
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #141b2e, stop:1 #0c1220);
+    border: 1px solid #4a3d1c;
+    border-radius: 18px;
+    margin-top: 12px;
+    padding: 10px 10px 9px 10px;
+    font-weight: 700;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
-    padding: 0 10px;
-    color: #93c5fd;
-    background-color: #0b1020;
+    padding: 2px 12px;
+    color: #f0d488;
+    background-color: transparent;
+    font-weight: 700;
 }
 
 QPushButton {
-    background-color: #4f46e5;
-    color: #ffffff;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #c9a227, stop:1 #f0d488);
+    background-color: #c9a227;
+    color: #171204;
     border: none;
     border-radius: 10px;
-    padding: 9px 18px;
-    font-weight: 600;
+    padding: 7px 14px;
+    font-weight: 700;
 }
-QPushButton:hover { background-color: #6366f1; }
-QPushButton:pressed { background-color: #4338ca; }
-QPushButton:disabled { background-color: #1f2937; color: #6b7280; }
+QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d4af37, stop:1 #f7e3ae); background-color: #d4af37; }
+QPushButton:pressed { background: #a8892a; }
+QPushButton:disabled { background: #2a2f3a; color: #8a8fa0; }
 QPushButton#secondary {
-    background-color: #1f2937;
-    color: #e5e7eb;
-    border: 1px solid #374151;
+    background-color: rgba(20, 27, 46, 0.92);
+    color: #f5f1e6;
+    border: 1px solid #4a3d1c;
 }
-QPushButton#secondary:hover { background-color: #273244; border-color: #4b5563; }
-QPushButton#danger { background-color: #dc2626; }
-QPushButton#danger:hover { background-color: #ef4444; }
+QPushButton#secondary:hover { background-color: #1c2440; border-color: #d4af37; }
+QPushButton#danger { background-color: #7a1f2b; }
+QPushButton#danger:hover { background-color: #9c2836; }
 
 QComboBox {
-    background-color: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 8px;
+    background-color: rgba(20, 27, 46, 0.92);
+    border: 1px solid #4a3d1c;
+    border-radius: 10px;
     padding: 7px 12px;
-    min-height: 26px;
+    min-height: 28px;
 }
-QComboBox:hover { border-color: #6366f1; }
-QComboBox:focus { border-color: #818cf8; }
+QComboBox:hover { border-color: #d4af37; }
+QComboBox:focus { border-color: #f0d488; }
 QComboBox QAbstractItemView {
-    background-color: #0f172a;
-    selection-background-color: #4f46e5;
-    border: 1px solid #334155;
+    background-color: #141a2b;
+    selection-background-color: #8a6d1f;
+    border: 1px solid #4a3d1c;
     padding: 4px;
 }
 
@@ -181,32 +188,32 @@ QCheckBox {
     padding: 4px 0;
 }
 QCheckBox::indicator {
-    width: 38px;
-    height: 20px;
-    border-radius: 10px;
-    background-color: #1f2937;
-    border: 1px solid #374151;
+    width: 34px;
+    height: 18px;
+    border-radius: 9px;
+    background-color: #232a3d;
+    border: 1px solid #4a3d1c;
 }
 QCheckBox::indicator:checked {
-    background-color: #4f46e5;
-    border-color: #4f46e5;
+    background-color: #c9a227;
+    border-color: #f0d488;
 }
 
 QSlider::groove:horizontal {
     height: 6px;
-    background: #1f2937;
+    background: #232a3d;
     border-radius: 3px;
 }
 QSlider::handle:horizontal {
-    background: #ffffff;
-    width: 18px;
-    height: 18px;
-    margin: -6px 0;
-    border-radius: 9px;
-    border: 2px solid #4f46e5;
+    background: #f0d488;
+    width: 16px;
+    height: 16px;
+    margin: -5px 0;
+    border-radius: 8px;
+    border: 2px solid #c9a227;
 }
 QSlider::sub-page:horizontal {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #22d3ee);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #c9a227, stop:1 #f0d488);
     border-radius: 3px;
 }
 
@@ -228,9 +235,9 @@ QLabel#linkLabel {
 QScrollArea { border: none; background: transparent; }
 
 QFrame#card {
-    background-color: #111827;
-    border: 1px solid #1f2937;
-    border-radius: 14px;
+    background-color: rgba(16, 22, 38, 0.92);
+    border: 1px solid #2c2440;
+    border-radius: 16px;
 }
 
 QScrollBar:vertical {
@@ -271,12 +278,31 @@ QToolTip {
 }
 
 QLineEdit, QTextEdit, QPlainTextEdit {
-    background-color: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 7px 10px;
+    background-color: #0a1120;
+    border: 1px solid #32415d;
+    border-radius: 10px;
+    padding: 5px 9px;
     selection-background-color: #4f46e5;
 }
+QFrame#heroCard, QFrame#activationCard {
+    background-color: rgba(16, 22, 38, 0.92);
+    border: 1px solid #4a3d1c;
+    border-radius: 18px;
+}
+QLabel#heroTitle { color: #f5f1e6; font-size: 14pt; font-weight: 700; }
+QLabel#heroSubtitle { color: #b8b0a0; font-size: 9pt; }
+QLabel#badgePrimary {
+    color: #f0d488; background-color: rgba(201, 162, 39, 0.14);
+    border: 1px solid #8a6d1f; border-radius: 8px; padding: 4px 8px;
+}
+QLabel#badgeSuccess {
+    color: #a7f3d0; background-color: rgba(22, 99, 78, 0.35);
+    border: 1px solid #16634e; border-radius: 8px; padding: 4px 8px;
+}
+QLabel#sectionEyebrow { color: #d4af37; font-size: 9pt; font-weight: 700; letter-spacing: 1px; }
+QLabel#deviceValue { color: #f5f1e6; font-size: 16pt; font-weight: 700; }
+QLabel#activationHint { color: #b8b0a0; font-size: 10pt; }
+QLabel#successText { color: #6ee7b7; font-weight: 600; }
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
     border-color: #818cf8;
 }
@@ -605,6 +631,99 @@ class _Switch(QWidget):
         self._checkbox.setChecked(value)
 
 
+class ActivationDialog(QDialog):
+    """Mandatory first-run activation shown before the product UI."""
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("HBM-LIVECAM - Kích hoạt thiết bị")
+        self.setModal(True)
+        self.setMinimumSize(720, 520)
+        self.resize(760, 560)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 28, 30, 28)
+        layout.setSpacing(18)
+
+        eyebrow = QLabel("HBM  /  COMMERCIAL EDITION")
+        eyebrow.setObjectName("sectionEyebrow")
+        title = QLabel("Kích hoạt HBM-LIVECAM")
+        title.setObjectName("heroTitle")
+        intro = QLabel("Liên kết bản quyền thương mại với thiết bị này để bắt đầu sử dụng.")
+        intro.setObjectName("heroSubtitle")
+        layout.addWidget(eyebrow)
+        layout.addWidget(title)
+        layout.addWidget(intro)
+
+        card = QFrame()
+        card.setObjectName("activationCard")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(24, 22, 24, 22)
+        card_layout.setSpacing(14)
+
+        device_caption = QLabel("MÃ THIẾT BỊ")
+        device_caption.setObjectName("sectionEyebrow")
+        card_layout.addWidget(device_caption)
+
+        device_row = QHBoxLayout()
+        self.device_id = QLineEdit(modules.device_identity.get_device_id())
+        self.device_id.setReadOnly(True)
+        self.device_id.setObjectName("deviceValue")
+        self.device_id.setMinimumHeight(48)
+        copy_button = QPushButton("Sao chép mã")
+        copy_button.setObjectName("secondary")
+        copy_button.setMinimumHeight(48)
+        copy_button.clicked.connect(
+            lambda: QApplication.clipboard().setText(self.device_id.text())
+        )
+        device_row.addWidget(self.device_id, 1)
+        device_row.addWidget(copy_button)
+        card_layout.addLayout(device_row)
+
+        hint = QLabel("Gửi mã thiết bị này cho quản trị viên để nhận key riêng. Mỗi key chỉ dùng cho đúng một thiết bị.")
+        hint.setObjectName("activationHint")
+        hint.setWordWrap(True)
+        card_layout.addWidget(hint)
+
+        key_caption = QLabel("KEY KÍCH HOẠT")
+        key_caption.setObjectName("sectionEyebrow")
+        card_layout.addWidget(key_caption)
+
+        self.key_input = QLineEdit()
+        self.key_input.setPlaceholderText("Dán key đã được cấp vào đây")
+        self.key_input.setMinimumHeight(48)
+        self.key_input.returnPressed.connect(self._activate)
+        card_layout.addWidget(self.key_input)
+
+        actions = QHBoxLayout()
+        secure = QLabel("●  Xác thực chữ ký số • Hoạt động ngoại tuyến")
+        secure.setObjectName("successText")
+        actions.addWidget(secure)
+        actions.addStretch(1)
+        activate_button = QPushButton("KÍCH HOẠT")
+        activate_button.setMinimumSize(150, 48)
+        activate_button.clicked.connect(self._activate)
+        actions.addWidget(activate_button)
+        card_layout.addLayout(actions)
+        layout.addWidget(card)
+        layout.addStretch(1)
+
+        footer = QLabel("HBM-LIVECAM  •  GPU-FIRST PORTRAIT STUDIO")
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        footer.setObjectName("heroSubtitle")
+        layout.addWidget(footer)
+
+    def _activate(self) -> None:
+        if modules.licensing.activate(self.key_input.text()):
+            QMessageBox.information(self, "HBM-LIVECAM", "Kích hoạt thành công.")
+            self.accept()
+            return
+        QMessageBox.critical(
+            self,
+            "HBM-LIVECAM",
+            "Key không hợp lệ hoặc không thuộc thiết bị này.",
+        )
+
+
 class MainWindow(QMainWindow):
     def __init__(self, start_cb: Callable, destroy_cb: Callable):
         super().__init__()
@@ -615,23 +734,53 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(
             f"{modules.metadata.name} {modules.metadata.version} {modules.metadata.edition}"
         )
-        self.setMinimumSize(ROOT_WIDTH, ROOT_HEIGHT)
+        self.setMinimumSize(560, 560)
         self.resize(ROOT_WIDTH, ROOT_HEIGHT)
 
         root = QWidget()
-        self.setCentralWidget(root)
+        root.setObjectName("appRoot")
+        root.setMinimumWidth(540)
+        scroll = QScrollArea()
+        scroll.setObjectName("appScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setWidget(root)
+        self.setCentralWidget(scroll)
         layout = QVBoxLayout(root)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(8, 7, 8, 8)
+        layout.setSpacing(5)
+
+        # Commercial product header
+        hero = QFrame()
+        hero.setObjectName("heroCard")
+        hero_layout = QHBoxLayout(hero)
+        hero_layout.setContentsMargins(10, 6, 10, 6)
+        brand = QVBoxLayout()
+        hero_title = QLabel("HBM  LIVECAM")
+        hero_title.setObjectName("heroTitle")
+        hero_subtitle = QLabel("GPU PORTRAIT STUDIO")
+        hero_subtitle.setObjectName("heroSubtitle")
+        brand.addWidget(hero_title)
+        brand.addWidget(hero_subtitle)
+        hero_layout.addLayout(brand)
+        hero_layout.addStretch(1)
+        gpu_badge = QLabel("● GPU")
+        gpu_badge.setObjectName("badgeSuccess")
+        output_badge = QLabel("9:16  /  720×1280")
+        output_badge.setObjectName("badgePrimary")
+        hero_layout.addWidget(gpu_badge)
+        hero_layout.addWidget(output_badge)
+        layout.addWidget(hero)
 
         # Source/Target row
         layout.addLayout(self._build_image_row())
 
-        # Options grid
-        layout.addWidget(self._build_options_card())
-
-        # Sliders card
-        layout.addWidget(self._build_sliders_card())
+        controls = QHBoxLayout()
+        controls.setSpacing(8)
+        controls.addWidget(self._build_options_card(), 3)
+        controls.addWidget(self._build_sliders_card(), 2)
+        layout.addLayout(controls)
 
         # Action buttons
         layout.addLayout(self._build_action_row())
@@ -639,31 +788,22 @@ class MainWindow(QMainWindow):
         # Camera selection
         layout.addWidget(self._build_camera_card())
 
-        # Activation
-        layout.addWidget(self._build_activation_card())
-
         # Status & footer
         self._status_label = QLabel("")
         self._status_label.setObjectName("statusLabel")
         self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._status_label)
 
-        footer = QLabel("Deep Live Cam")
-        footer.setObjectName("linkLabel")
-        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        footer.setCursor(Qt.CursorShape.PointingHandCursor)
-        footer.mousePressEvent = lambda _e: webbrowser.open("https://deeplivecam.net")
-        layout.addWidget(footer)
 
     # -- image row --------------------------------------------------------
 
     def _build_image_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
-        row.setSpacing(16)
+        row.setSpacing(8)
 
         # Source column
         src_col = QVBoxLayout()
-        self.source_label = _make_image_drop(_("Source face"), (200, 200))
+        self.source_label = _make_image_drop(_("Source face"), (SOURCE_TARGET_PREVIEW_SIZE, SOURCE_TARGET_PREVIEW_SIZE))
         src_col.addWidget(self.source_label, alignment=Qt.AlignmentFlag.AlignCenter)
         src_row = QHBoxLayout()
         self.btn_select_source = QPushButton(_("Select a face"))
@@ -671,23 +811,15 @@ class MainWindow(QMainWindow):
             _("Choose the source face image to swap onto the target")
         )
         self.btn_select_source.clicked.connect(self._on_select_source)
-        self.btn_random_face = QPushButton("R")
-        self.btn_random_face.setObjectName("secondary")
-        self.btn_random_face.setFixedWidth(40)
-        self.btn_random_face.setToolTip(
-            _("Get a random face from thispersondoesnotexist.com")
-        )
-        self.btn_random_face.clicked.connect(self._on_random_face)
         src_row.addWidget(self.btn_select_source)
-        src_row.addWidget(self.btn_random_face)
         src_col.addLayout(src_row)
 
         # Swap button column
         swap_col = QVBoxLayout()
         swap_col.addStretch(1)
-        self.btn_swap = QPushButton("<->")
+        self.btn_swap = QPushButton("↔")
         self.btn_swap.setObjectName("secondary")
-        self.btn_swap.setFixedSize(44, 44)
+        self.btn_swap.setFixedSize(34, 34)
         self.btn_swap.setToolTip(_("Swap source and target images"))
         self.btn_swap.clicked.connect(self._on_swap_paths)
         swap_col.addWidget(self.btn_swap, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -695,7 +827,7 @@ class MainWindow(QMainWindow):
 
         # Target column
         tgt_col = QVBoxLayout()
-        self.target_label = _make_image_drop(_("Target"), (200, 200))
+        self.target_label = _make_image_drop(_("Target"), (SOURCE_TARGET_PREVIEW_SIZE, SOURCE_TARGET_PREVIEW_SIZE))
         tgt_col.addWidget(self.target_label, alignment=Qt.AlignmentFlag.AlignCenter)
         self.btn_select_target = QPushButton(_("Select a target"))
         self.btn_select_target.setToolTip(
@@ -714,8 +846,8 @@ class MainWindow(QMainWindow):
     def _build_options_card(self) -> QGroupBox:
         card = QGroupBox(_("Options"))
         grid = QGridLayout(card)
-        grid.setHorizontalSpacing(20)
-        grid.setVerticalSpacing(6)
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(4)
 
         def make(field, label, tip):
             sw = _Switch(_(label), getattr(modules.globals, field), _(tip))
@@ -747,7 +879,7 @@ class MainWindow(QMainWindow):
                                     _("Manually assign which source face maps to which target face"))
         self.sw_map_faces.toggled.connect(self._on_map_faces_toggled)
 
-        # Layout: 2 columns of switches
+        # Two-column control matrix inside the left dashboard pane.
         items = [
             self.sw_keep_fps, self.sw_keep_audio,
             self.sw_keep_frames, self.sw_many_faces,
@@ -759,7 +891,7 @@ class MainWindow(QMainWindow):
 
         # Face enhancer dropdown
         enhancer_label = QLabel(_("Face Enhancer:"))
-        grid.addWidget(enhancer_label, len(items) // 2, 0)
+        grid.addWidget(enhancer_label, 4, 0)
 
         self.cb_enhancer = QComboBox()
         self.cb_enhancer.addItems(["None", "GFPGAN", "GPEN-512", "GPEN-256"])
@@ -773,7 +905,7 @@ class MainWindow(QMainWindow):
         self.cb_enhancer.setCurrentText(initial)
         self.cb_enhancer.currentTextChanged.connect(self._on_enhancer_change)
         self.cb_enhancer.setToolTip(_("Select a face enhancement model (None = no enhancement)"))
-        grid.addWidget(self.cb_enhancer, len(items) // 2, 1)
+        grid.addWidget(self.cb_enhancer, 4, 1)
 
         return card
 
@@ -826,7 +958,7 @@ class MainWindow(QMainWindow):
         self.btn_start.setToolTip(_("Begin processing the target image/video with selected face"))
         self.btn_start.clicked.connect(self._on_start)
 
-        self.btn_destroy = QPushButton(_("Destroy"))
+        self.btn_destroy = QPushButton(_("Exit"))
         self.btn_destroy.setObjectName("danger")
         self.btn_destroy.setToolTip(_("Stop processing and close the application"))
         self.btn_destroy.clicked.connect(lambda: self._destroy_cb())
@@ -841,10 +973,10 @@ class MainWindow(QMainWindow):
         self.btn_update.setToolTip(_("Check GitHub for a newer release"))
         self.btn_update.clicked.connect(self._on_check_update)
 
-        row.addWidget(self.btn_start)
-        row.addWidget(self.btn_destroy)
+        row.addWidget(self.btn_start, 2)
         row.addWidget(self.btn_preview)
         row.addWidget(self.btn_update)
+        row.addWidget(self.btn_destroy)
         return row
 
     # -- camera card ------------------------------------------------------
@@ -881,73 +1013,6 @@ class MainWindow(QMainWindow):
         self.btn_refresh_cameras.setToolTip(_("Rescan available cameras"))
         self.btn_refresh_cameras.clicked.connect(self._on_refresh_cameras)
         grid.addWidget(self.btn_refresh_cameras, 0, 3)
-
-        # Row 1: capture resolution
-        grid.addWidget(QLabel(_("Resolution:")), 1, 0)
-        self.cb_resolution = QComboBox()
-        # 640x480 is native on virtually every webcam and the safest 30fps
-        # mode on USB 2.0. Higher tiers are 16:9 and useful when the camera
-        # supports them natively (DSLR + capture card, USB 3.0 webcams).
-        self._resolution_options = [
-            ("640 x 480", (640, 480)),
-            ("960 x 540 (qHD)", (960, 540)),
-            ("1280 x 720 (HD)", (1280, 720)),
-            ("1920 x 1080 (FHD)", (1920, 1080)),
-        ]
-        for label, _wh in self._resolution_options:
-            self.cb_resolution.addItem(label)
-        cur = tuple(modules.globals.capture_resolution)
-        idx = next((i for i, (_, wh) in enumerate(self._resolution_options) if wh == cur), 0)
-        self.cb_resolution.setCurrentIndex(idx)
-        self.cb_resolution.currentIndexChanged.connect(self._on_resolution_change)
-        self.cb_resolution.setToolTip(_(
-            "Requested webcam resolution. Camera may negotiate to its "
-            "nearest supported size - actual size printed in console as "
-            "'[VideoCapturer] WxH @ FPS'. Applies on next Live start.\n\n"
-            "640x480 is native on virtually every webcam and the safest "
-            "30fps choice. qHD often works too. HD/FHD typically drop to "
-            "~10fps on USB 2.0 webcams due to isochronous bandwidth limits."
-        ))
-        grid.addWidget(self.cb_resolution, 1, 1, 1, 2)
-
-        # Row 2: face detection size
-        grid.addWidget(QLabel(_("Det size:")), 2, 0)
-        self.cb_det_size = QComboBox()
-        self._det_size_options = [160, 320, 640]
-        for v in self._det_size_options:
-            self.cb_det_size.addItem(f"{v} x {v}")
-        cur_det = int(getattr(modules.globals, 'det_size', modules.globals.DEFAULT_DET_SIZE))
-        # Normalize to a valid option first so .index() can never raise: fall back
-        # to the default size, then to the last (highest) option if even that is
-        # somehow missing.
-        if cur_det not in self._det_size_options:
-            cur_det = (modules.globals.DEFAULT_DET_SIZE
-                       if modules.globals.DEFAULT_DET_SIZE in self._det_size_options
-                       else self._det_size_options[-1])
-        idx = self._det_size_options.index(cur_det)
-        self.cb_det_size.setCurrentIndex(idx)
-        self.cb_det_size.currentIndexChanged.connect(self._on_det_size_change)
-        self.cb_det_size.setToolTip(_(
-            "Face detection input resolution. Lower = faster, less accurate at "
-            "distance. Changes take effect on next face analyser init."
-        ))
-        grid.addWidget(self.cb_det_size, 2, 1, 1, 2)
-
-        # Row 3: cap inference so a fast camera cannot keep a small GPU busy
-        # processing frames faster than the live preview needs.
-        grid.addWidget(QLabel(_("Live FPS limit:")), 3, 0)
-        self.cb_live_fps = QComboBox()
-        self._live_fps_options = [15, 24, 30]
-        for value in self._live_fps_options:
-            self.cb_live_fps.addItem(f"{value} FPS", value)
-        fps_idx = self._live_fps_options.index(modules.globals.live_fps_limit)
-        self.cb_live_fps.setCurrentIndex(fps_idx)
-        self.cb_live_fps.currentIndexChanged.connect(self._on_live_fps_change)
-        self.cb_live_fps.setToolTip(_(
-            "Limits live face processing rate to reduce GPU load. "
-            "Applies on next Live start."
-        ))
-        grid.addWidget(self.cb_live_fps, 3, 1, 1, 2)
 
         grid.setColumnStretch(1, 1)
         return card
@@ -1003,7 +1068,7 @@ class MainWindow(QMainWindow):
         if path and is_image(path):
             modules.globals.source_path = path
             _RECENT_SOURCE_DIR = os.path.dirname(path)
-            self.source_label.setPixmap(render_image_preview(path, (200, 200)))
+            self.source_label.setPixmap(render_image_preview(path, (SOURCE_TARGET_PREVIEW_SIZE, SOURCE_TARGET_PREVIEW_SIZE)))
             self.source_label.setText("")
         elif not path:
             return
@@ -1026,12 +1091,12 @@ class MainWindow(QMainWindow):
         if is_image(path):
             modules.globals.target_path = path
             _RECENT_TARGET_DIR = os.path.dirname(path)
-            self.target_label.setPixmap(render_image_preview(path, (200, 200)))
+            self.target_label.setPixmap(render_image_preview(path, (SOURCE_TARGET_PREVIEW_SIZE, SOURCE_TARGET_PREVIEW_SIZE)))
             self.target_label.setText("")
         elif is_video(path):
             modules.globals.target_path = path
             _RECENT_TARGET_DIR = os.path.dirname(path)
-            pm = render_video_preview(path, (200, 200))
+            pm = render_video_preview(path, (SOURCE_TARGET_PREVIEW_SIZE, SOURCE_TARGET_PREVIEW_SIZE))
             if pm:
                 self.target_label.setPixmap(pm)
                 self.target_label.setText("")
@@ -1062,7 +1127,7 @@ class MainWindow(QMainWindow):
             try:
                 with open(staging_path, "wb") as f:
                     f.write(response.content)
-                pixmap = render_image_preview(staging_path, (200, 200))
+                pixmap = render_image_preview(staging_path, (SOURCE_TARGET_PREVIEW_SIZE, SOURCE_TARGET_PREVIEW_SIZE))
                 if imread_unicode(staging_path) is None:
                     raise ValueError("downloaded image could not be decoded")
                 os.replace(staging_path, temp_path)
@@ -1089,8 +1154,8 @@ class MainWindow(QMainWindow):
         _RECENT_TARGET_DIR = os.path.dirname(sp)
         if _PREVIEW is not None:
             _PREVIEW.hide()
-        self.source_label.setPixmap(render_image_preview(tp, (200, 200)))
-        self.target_label.setPixmap(render_image_preview(sp, (200, 200)))
+        self.source_label.setPixmap(render_image_preview(tp, (SOURCE_TARGET_PREVIEW_SIZE, SOURCE_TARGET_PREVIEW_SIZE)))
+        self.target_label.setPixmap(render_image_preview(sp, (SOURCE_TARGET_PREVIEW_SIZE, SOURCE_TARGET_PREVIEW_SIZE)))
         self.source_label.setText("")
         self.target_label.setText("")
 
@@ -1231,59 +1296,44 @@ class MainWindow(QMainWindow):
         update_status("Cameras refreshed")
 
     def _build_activation_card(self) -> QGroupBox:
-        card = QGroupBox(_("Device & Activation"))
+        card = QGroupBox(_("Bản quyền thiết bị"))
         grid = QGridLayout(card)
-        grid.setHorizontalSpacing(12)
+        grid.setContentsMargins(14, 12, 14, 10)
+        grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(6)
 
-        grid.addWidget(QLabel(_("Device ID:")), 0, 0)
+        device_caption = QLabel(_("Thiết bị"))
+        device_caption.setObjectName("heroSubtitle")
+        grid.addWidget(device_caption, 0, 0)
         self._device_id_label = QLabel(modules.device_identity.get_device_id())
         self._device_id_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         grid.addWidget(self._device_id_label, 0, 1)
-        btn_copy = QPushButton(_("Copy"))
+        btn_copy = QPushButton(_("Sao chép"))
         btn_copy.setObjectName("secondary")
         btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(modules.device_identity.get_device_id()))
         grid.addWidget(btn_copy, 0, 2)
 
-        self._host_info = QLabel(_collect_host_info())
-        self._host_info.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        grid.addWidget(self._host_info, 1, 0, 1, 3)
-
-        btn_scan = QPushButton(_("Scan Device"))
-        btn_scan.setObjectName("secondary")
-        btn_scan.clicked.connect(self._on_scan_device)
-        grid.addWidget(btn_scan, 2, 0)
-
-        grid.addWidget(QLabel(_("License Key:")), 3, 0)
-        self._license_input = QLineEdit()
-        self._license_input.setPlaceholderText("HBM-XXXXX-XXXXX-XXXXX-XXXXX")
-        grid.addWidget(self._license_input, 3, 1)
-
-        self._btn_activate = QPushButton(_("Activate"))
-        self._btn_activate.clicked.connect(self._on_activate)
-        grid.addWidget(self._btn_activate, 3, 2)
+        self._host_info = QLabel("● GPU ưu tiên  •  CPU chỉ cho node không hỗ trợ")
+        self._host_info.setObjectName("successText")
+        grid.addWidget(self._host_info, 1, 0, 1, 2)
 
         self._activation_status = QLabel(modules.licensing.current_status())
-        self._activation_status.setObjectName("statusLabel")
-        grid.addWidget(self._activation_status, 4, 0, 1, 3)
+        self._activation_status.setObjectName("successText")
+        grid.addWidget(self._activation_status, 1, 2, alignment=Qt.AlignmentFlag.AlignRight)
 
         notice = QLabel(_("HBM khuyến cáo không sử dụng vào những việc phi pháp, miễn trừ trách nhiệm."))
         notice.setObjectName("statusLabel")
         notice.setWordWrap(True)
-        grid.addWidget(notice, 5, 0, 1, 3)
+        grid.addWidget(notice, 2, 0, 1, 3)
+        grid.setColumnStretch(1, 1)
         return card
 
     def _on_scan_device(self) -> None:
-        self._host_info.setText(_collect_host_info())
-        update_status("Device scanned")
+        self._host_info.setText("Đã quét thiết bị  •  GPU ưu tiên")
+        update_status("Đã quét lại thiết bị")
 
     def _on_activate(self) -> None:
-        if modules.licensing.activate(self._license_input.text()):
-            self._activation_status.setText(modules.licensing.current_status())
-            update_status("Activation successful")
-        else:
-            self._activation_status.setText("Activation failed")
-            update_status("Activation failed")
+        self._activation_status.setText(modules.licensing.current_status())
 
     def _on_check_update(self) -> None:
         try:
@@ -1971,6 +2021,11 @@ def init(
     else:
         _APP = QApplication.instance()
     _APP.setStyleSheet(QSS)
+
+    if not modules.licensing.is_activated():
+        activation = ActivationDialog()
+        if activation.exec() != QDialog.DialogCode.Accepted:
+            raise SystemExit(2)
 
     _BRIDGE = _UIBridge()
     def _destroy_with_cleanup(*args, **kwargs):

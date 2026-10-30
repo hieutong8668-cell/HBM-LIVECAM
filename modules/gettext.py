@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 class LanguageManager:
-    def __init__(self, default_language="en"):
+    def __init__(self, default_language="vi"):
         self.current_language = default_language
         self.translations = {}
         self.load_language(default_language)
