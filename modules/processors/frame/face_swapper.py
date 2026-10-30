@@ -1,6 +1,7 @@
 from typing import Any, List, Optional, Tuple
 import cv2
 import insightface
+import onnxruntime as ort
 import logging
 import threading
 import numpy as np
@@ -219,8 +220,9 @@ def pre_start() -> bool:
     fp16_path = os.path.join(models_dir, "inswapper_128_fp16.onnx")
     fp32_path = os.path.join(models_dir, "inswapper_128.onnx")
     if not os.path.exists(fp16_path) and not os.path.exists(fp32_path):
-        update_status(f"Model not found in {models_dir}. Please download inswapper_128.onnx.", NAME)
-        return False
+        update_status("Downloading the required face-swap model...", NAME)
+        if not pre_check():
+            return False
 
     # Try to get the face swapper to ensure it loads correctly
     if get_face_swapper() is None:
@@ -287,6 +289,13 @@ def get_face_swapper() -> Any:
                     model_path,
                     providers=providers_config,
                 )
+                if "CUDAExecutionProvider" in modules.globals.execution_providers:
+                    from modules.processors.frame._onnx_enhancer import strict_cuda_session_options
+                    FACE_SWAPPER.session = ort.InferenceSession(
+                        model_path,
+                        sess_options=strict_cuda_session_options(),
+                        providers=["CUDAExecutionProvider"],
+                    )
                 # Set up CUDA graph session for faster inference
                 if _HAS_TORCH_CUDA and any(
                     p == "CUDAExecutionProvider" or

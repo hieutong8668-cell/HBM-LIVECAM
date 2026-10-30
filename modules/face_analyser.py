@@ -57,6 +57,18 @@ def get_face_analyser() -> Any:
                     providers=providers,
                     allowed_modules=['detection', 'recognition', 'landmark_2d_106']
                 )
+                if "CUDAExecutionProvider" in modules.globals.execution_providers:
+                    import onnxruntime
+                    from modules.processors.frame._onnx_enhancer import strict_cuda_session_options
+                    for model in analyser.models.values():
+                        model_path = getattr(model, "model_file", None)
+                        if not model_path:
+                            continue
+                        model.session = onnxruntime.InferenceSession(
+                            model_path,
+                            sess_options=strict_cuda_session_options(),
+                            providers=["CUDAExecutionProvider"],
+                        )
                 det_size = _current_det_size()
                 analyser.prepare(ctx_id=0, det_size=det_size)
                 _optimize_det_model(analyser, providers, det_size)

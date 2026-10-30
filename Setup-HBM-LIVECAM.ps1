@@ -1,161 +1,225 @@
 [CmdletBinding()]
 param()
-$ErrorActionPreference = 'Stop'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$ProgressPreference = 'SilentlyContinue'
-$appRoot = Join-Path $env:LOCALAPPDATA 'Programs\HBM-LIVECAM'
-    if (Test-Path -LiteralPath $appRoot) { Remove-Item -LiteralPath $appRoot -Recurse -Force -ErrorAction SilentlyContinue }
-$runtimeRoot = Join-Path $appRoot 'python'
-$venv = Join-Path $appRoot 'venv'
-$installer = Join-Path $env:TEMP 'python-3.12.10-amd64.exe'
-$pythonUrls = @('https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe','https://mirrors.huaweicloud.com/python/3.12.10/python-3.12.10-amd64.exe')
 
-function Say([string]$Message) { Write-Host ''; Write-Host "==> $Message" -ForegroundColor Cyan }
-function Fail([string]$Message) { throw $Message }
-function Find-Python312Runtime {
-    $candidates = @(
-        (Join-Path $env:LOCALAPPDATA 'HBM-LIVECAM\runtime\python312'),
-        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312')
-    )
-    $registryLocations = @(
-        @{ Hive = [Microsoft.Win32.Registry]::CurrentUser; Path = 'Software\Python\PythonCore\3.12\InstallPath' },
-        @{ Hive = [Microsoft.Win32.Registry]::LocalMachine; Path = 'Software\Python\PythonCore\3.12\InstallPath' }
-    )
-    foreach ($location in $registryLocations) {
-        $key = $null
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+$appRoot = Join-Path $env:LOCALAPPDATA 'Programs\HBM-LIVECAM'
+$runtimeRoot = Join-Path $appRoot 'python'
+$python = Join-Path $runtimeRoot 'python.exe'
+$logPath = Join-Path $PSScriptRoot 'install.log'
+$pythonVersion = '3.10.11'
+
+function Write-Step([string]$Message) {
+    Write-Host "`n==> $Message" -ForegroundColor Cyan
+    Add-Content -LiteralPath $logPath -Value "[$(Get-Date -Format o)] $Message" -Encoding UTF8
+}
+
+function Invoke-Download([string[]]$Urls, [string]$Destination) {
+    foreach ($url in $Urls) {
         try {
-            $key = $location.Hive.OpenSubKey($location.Path)
-            if ($key) {
-                $installPath = [string]$key.GetValue('')
-                $executablePath = [string]$key.GetValue('ExecutablePath')
-                if ($installPath) { $candidates += $installPath }
-                if ($executablePath) { $candidates += (Split-Path -Parent $executablePath) }
+            Write-Step "Dang tai $url"
+            Invoke-WebRequest -Uri $url -OutFile $Destination -UseBasicParsing
+            if ((Test-Path -LiteralPath $Destination) -and (Get-Item -LiteralPath $Destination).Length -gt 0) {
+                return
             }
-        } finally {
-            if ($key) { $key.Dispose() }
+        } catch {
+            Add-Content -LiteralPath $logPath -Value "Tai that bai: $url - $($_.Exception.Message)" -Encoding UTF8
         }
     }
+    throw "Khong tai duoc tep phu tro: $([IO.Path]::GetFileName($Destination))"
+}
 
-    $probeCode = "import sys; print(str(sys.version_info.major)+'.'+str(sys.version_info.minor))"
-    foreach ($candidate in ($candidates | Select-Object -Unique)) {
-        $candidatePython = Join-Path $candidate 'python.exe'
-        if (-not (Test-Path -LiteralPath $candidatePython)) { continue }
-        $probe = @(& $candidatePython -c $probeCode 2>$null) -join ''
-        if ($LASTEXITCODE -eq 0 -and $probe -match '^3\.12\|') { return $candidate }
+function Test-Python310([string]$Executable) {
+    if (-not (Test-Path -LiteralPath $Executable)) { return $false }
+    $version = @(& $Executable -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null) -join ''
+    $pythonHeader = Join-Path (Split-Path -Parent $Executable) 'Include\Python.h'
+    return ($LASTEXITCODE -eq 0 -and $version.Trim() -eq '3.10' -and (Test-Path -LiteralPath $pythonHeader))
+}
+
+function Find-SystemPython310 {
+    $candidates = @()
+    $cmd = Get-Command 'py.exe' -ErrorAction SilentlyContinue
+    if ($cmd) {
+        $v = @(& $cmd.Source '-3.10' -c "import sys; print(sys.executable)" 2>$null) -join ''
+        if ($LASTEXITCODE -eq 0 -and $v.Trim()) { $candidates += $v.Trim() }
+    }
+    $cmd = Get-Command 'python.exe' -ErrorAction SilentlyContinue
+    if ($cmd) { $candidates += $cmd.Source }
+    $candidates += @(
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python310\python.exe'),
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python310-64\python.exe'),
+        'C:\Program Files\Python310\python.exe',
+        'C:\Python310\python.exe'
+    )
+    foreach ($candidate in $candidates) {
+        if ($candidate -and (Test-Python310 $candidate)) { return $candidate }
     }
     return $null
 }
 
 try {
-    if (-not [Environment]::Is64BitOperatingSystem) { Fail '?ng d?ng c?n Windows 64-bit.' }
+    Set-Content -LiteralPath $logPath -Value "HBM-LIVECAM install - $(Get-Date -Format o)" -Encoding UTF8
+    if (-not [Environment]::Is64BitOperatingSystem) { throw 'HBM-LIVECAM yeu cau Windows 64-bit.' }
+
+    Write-Step 'Cap nhat tep ung dung'
     New-Item -ItemType Directory -Path $appRoot -Force | Out-Null
-    Say 'Sao chط·آ£ط¢آ©p ?ng d?ng vط·آ£ط¢آ o th? m?c riط·آ£ط¹آ¾ng'
     Get-ChildItem -LiteralPath $PSScriptRoot -Force | Where-Object {
-        $_.Name -notin @('Setup-HBM-LIVECAM.ps1', 'Install-HBM-LIVECAM.cmd', 'models')
+        $_.Name -notin @('.git', '__pycache__', 'support-cache', 'install.log', 'device-scan.json')
     } | Copy-Item -Destination $appRoot -Recurse -Force
-    $sourceModels = Join-Path $PSScriptRoot 'models'
-    $installedModels = Join-Path $appRoot 'models'
-    New-Item -ItemType Directory -Path $installedModels -Force | Out-Null
-    if (Test-Path -LiteralPath $sourceModels) {
-        Get-ChildItem -LiteralPath $sourceModels -File -Recurse -Force | ForEach-Object {
-            $relative = $_.FullName.Substring($sourceModels.Length).TrimStart('\')
-            $destination = Join-Path $installedModels $relative
-            if (-not (Test-Path -LiteralPath $destination)) {
-                New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-                Copy-Item -LiteralPath $_.FullName -Destination $destination
-            }
+
+    $systemPython = Find-SystemPython310
+    if ($systemPython) {
+        Write-Step "Su dung Python 3.10 co san: $systemPython"
+        $python = $systemPython
+        $runtimeRoot = Split-Path -Parent $python
+    } elseif (-not (Test-Python310 $python)) {
+        Write-Step 'Cai Python 3.10 day du rieng cho ung dung'
+        if (Test-Path -LiteralPath $runtimeRoot) { Remove-Item -LiteralPath $runtimeRoot -Recurse -Force }
+        $pythonPackage = Join-Path $env:TEMP "python-$pythonVersion-x64.nupkg"
+        Invoke-Download @(
+            "https://www.nuget.org/api/v2/package/python/$pythonVersion"
+        ) $pythonPackage
+        $pythonZip = Join-Path $env:TEMP "python-$pythonVersion-x64.zip"
+        Copy-Item -LiteralPath $pythonPackage -Destination $pythonZip -Force
+        $pythonExtract = Join-Path $env:TEMP "hbm-python-$pythonVersion"
+        if (Test-Path -LiteralPath $pythonExtract) { Remove-Item -LiteralPath $pythonExtract -Recurse -Force }
+        Expand-Archive -LiteralPath $pythonZip -DestinationPath $pythonExtract -Force
+        $pythonTools = Join-Path $pythonExtract 'tools'
+        if (-not (Test-Path -LiteralPath (Join-Path $pythonTools 'python.exe'))) {
+            throw 'Goi Python 3.10 day du khong hop le.'
+        }
+        New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
+        Get-ChildItem -LiteralPath $pythonTools -Force | Copy-Item -Destination $runtimeRoot -Recurse -Force
+        if (-not (Test-Python310 $python)) {
+            throw 'Khong tao duoc runtime Python 3.10 day du.'
+        }
+        & $python -m pip --version 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            $getPip = Join-Path $env:TEMP 'hbm-get-pip.py'
+            Invoke-Download @('https://bootstrap.pypa.io/get-pip.py') $getPip
+            & $python $getPip --disable-pip-version-check
+            if ($LASTEXITCODE -ne 0) { throw 'Khong cai duoc pip cho Python 3.10.' }
         }
     }
 
-    $python = Join-Path $runtimeRoot 'python.exe'
-    $probeCode = "import sys; print(str(sys.version_info.major)+'.'+str(sys.version_info.minor))"
-    if (Test-Path -LiteralPath $python) {
-        $runtimeProbe = @(& $python -c $probeCode 2>$null) -join ''
-        if ($LASTEXITCODE -ne 0 -or $runtimeProbe -notmatch '^3\.12') {
-            Say 'Runtime riط·آ£ط¹آ¾ng hi?n t?i khط·آ£ط¢آ´ng h?p l?; t?o l?i t? runtime Python ?? x?c minh'
-            Remove-Item -LiteralPath $runtimeRoot -Recurse -Force
+    Write-Step 'Tai va cai cac thu vien phu tro'
+    & $python -m pip install --disable-pip-version-check --prefer-binary --upgrade pip setuptools wheel
+    if ($LASTEXITCODE -ne 0) { throw 'Khong cap nhat duoc pip/setuptools/wheel.' }
+    Write-Step 'Cai cong cu dung InsightFace'
+    & $python -m pip install --disable-pip-version-check --prefer-binary 'numpy>=2.0,<3' 'Cython>=3' packaging
+    if ($LASTEXITCODE -ne 0) { throw 'Khong cai duoc numpy/Cython.' }
+    & $python -m pip install --disable-pip-version-check --no-build-isolation 'insightface==0.7.3'
+    if ($LASTEXITCODE -ne 0) {
+        Write-Step 'InsightFace can C++ Build Tools; dang kiem tra/cai bo bien dich'
+        $buildTools = Join-Path $env:TEMP 'vs_BuildTools.exe'
+        $vswhere = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
+        $hasBuildTools = $false
+        if (Test-Path -LiteralPath $vswhere) {
+            $installations = @(& $vswhere -products Microsoft.VisualStudio.Product.BuildTools -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)
+            $hasBuildTools = ($LASTEXITCODE -eq 0 -and $installations.Count -gt 0)
         }
-    }
-    if (-not (Test-Path -LiteralPath $python)) {
-        $sourceRuntime = Find-Python312Runtime
-        if ($sourceRuntime) {
-            Say 'Sao chط·آ£ط¢آ©p Python 3.12 ?? x?c minh vط·آ£ط¢آ o runtime riط·آ£ط¹آ¾ng c?a HBM AI'
-            New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
-            Get-ChildItem -LiteralPath $sourceRuntime -Force | Copy-Item -Destination $runtimeRoot -Recurse -Force
-        } else {
-            New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
-            $localInstaller = Join-Path $PSScriptRoot 'python-3.12.10-amd64.exe'
-            if (Test-Path -LiteralPath $localInstaller) {
-                Say 'Dung bo cai Python 3.12.10 co san trong goi'
-                $installer = $localInstaller
-            } else {
-                Say 'Tai Python 3.12.10 embedded'
-                $zipUrl = 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip'
-                $zipFile = Join-Path $env:TEMP 'python-3.12.10-embed-amd64.zip'
-                $downloaded = $false
-                try {
-                    Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
-                    $downloaded = $true
-                } catch {
-                    $downloaded = $false
-                }
-                if (-not $downloaded) { Fail 'Khong tai duoc Python 3.12.10 embedded.' }
-                if (Test-Path -LiteralPath $runtimeRoot) { Remove-Item -LiteralPath $runtimeRoot -Recurse -Force }
-                New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
-                Expand-Archive -Path $zipFile -DestinationPath $runtimeRoot -Force
-                $getPip = Join-Path $env:TEMP 'get-pip.py'
-                $pthFile = Join-Path $runtimeRoot 'python312._pth'
-                if (Test-Path -LiteralPath $pthFile) { (Get-Content $pthFile) -replace '#import site','import site' | Set-Content $pthFile }
-                Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile $getPip -UseBasicParsing
-                & (Join-Path $runtimeRoot 'python.exe') $getPip
-            }
+        if (-not $hasBuildTools) {
+            Invoke-Download @('https://aka.ms/vs/17/release/vs_BuildTools.exe') $buildTools
+            $process = Start-Process -FilePath $buildTools -ArgumentList @(
+                '--quiet', '--wait', '--norestart',
+                '--add', 'Microsoft.VisualStudio.Workload.VCTools', '--includeRecommended'
+            ) -Wait -PassThru
+            if ($process.ExitCode -notin @(0, 3010)) { throw "C++ Build Tools loi ma $($process.ExitCode)." }
         }
+        & $python -m pip install --disable-pip-version-check --no-build-isolation 'insightface==0.7.3'
+        if ($LASTEXITCODE -ne 0) { throw 'Khong dung duoc InsightFace sau khi da co numpy, Cython va C++ Build Tools.' }
     }
-    if (-not (Test-Path -LiteralPath $python)) {
-        $found = Get-ChildItem -LiteralPath $runtimeRoot -Filter python.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($found) { $python = $found.FullName }
-    }
-    if (-not (Test-Path -LiteralPath $python)) { Fail 'Khong tim thay Python rieng cua ung dung.' }
-    $runtimeProbe = @(& $python -c $probeCode 2>$null) -join ''
-    if ($LASTEXITCODE -ne 0 -or $runtimeProbe -notmatch '^3\.12') {
-        Fail 'Python riط·آ£ط¹آ¾ng ch?a ?? Python 3.12, pip vط·آ£ط¢آ  Tcl/Tk; ch?a ch?y ti?p cط·آ£ط¢آ i th? vi?n.'
+    & $python -m pip install --disable-pip-version-check --prefer-binary -r (Join-Path $appRoot 'requirements.txt')
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Cai cac thu vien Python con lai that bai.'
     }
 
-    Say 'T?o mط·آ£ط¢آ´i tr??ng riط·آ£ط¹آ¾ng vط·آ£ط¢آ  cط·آ£ط¢آ i b? x? l? CUDA g?n'
-    $vp = $python  # embedded python, no venv
-    #
-    #
-    #
-    #
-    #
-
-    & $vp -m pip install --prefer-binary numpy Cython setuptools wheel
-    if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
-        Fail 'Thieu Microsoft C++ Build Tools. Hay cai Build Tools (Desktop development with C++) roi chay lai.'
+    $appBin = Join-Path $appRoot 'bin'
+    $ffmpeg = Join-Path $appBin 'ffmpeg.exe'
+    if (-not (Test-Path -LiteralPath $ffmpeg)) {
+        Write-Step 'Tai FFmpeg phu tro xu ly video'
+        & $python -m pip install --disable-pip-version-check --prefer-binary imageio-ffmpeg
+        if ($LASTEXITCODE -ne 0) { throw 'Khong tai duoc FFmpeg.' }
+        $downloadedFfmpeg = @(& $python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())") -join ''
+        if (-not (Test-Path -LiteralPath $downloadedFfmpeg.Trim())) { throw 'Khong tim thay FFmpeg sau khi tai.' }
+        New-Item -ItemType Directory -Path $appBin -Force | Out-Null
+        Copy-Item -LiteralPath $downloadedFfmpeg.Trim() -Destination $ffmpeg -Force
     }
-    $requirementsArgs = @('-m', 'pip', 'install', '--prefer-binary')
-    $localWheelhouse = Join-Path $env:LOCALAPPDATA 'HBM-LIVECAM\app\beta\wheels'
-    if (Test-Path -LiteralPath $localWheelhouse) {
-        Say 'Dط·آ£ط¢آ¹ng wheel t??ng th?ch ?? c? trط·آ£ط¹آ¾n m?y tr??c khi l?y ph?n c?n thi?u'
-        $requirementsArgs += @('--find-links', $localWheelhouse)
-    }
-    $requirementsArgs += @('-r', (Join-Path $appRoot 'requirements.txt'))
-    & $vp @requirementsArgs
-    if ($LASTEXITCODE -ne 0) { Fail 'Cط·آ£ط¢آ i th? vi?n th?t b?i. N?u l?i ? InsightFace, c?n Microsoft C++ Build Tools; xem log pip ph?a trط·آ£ط¹آ¾n.' }
+    $env:PATH = "$appBin;$env:PATH"
+    & $ffmpeg -version | Select-Object -First 1
+    if ($LASTEXITCODE -ne 0) { throw 'FFmpeg khong chay duoc.' }
 
-    Say 'X?c nh?n ONNX Runtime nh?n ???c GPU NVIDIA'
-    & $vp -c "import onnxruntime as ort; ort.preload_dlls(); providers=ort.get_available_providers(); print('ORT',ort.__version__,'providers',providers); assert 'CUDAExecutionProvider' in providers"
-    if ($LASTEXITCODE -ne 0) { Fail 'ONNX Runtime ch?a nh?n CUDA; khط·آ£ط¢آ´ng t?o l?i t?t ch?y.' }
+    Write-Step 'Tu dong quet GPU va camera'
+    Push-Location $appRoot
+    try {
+        & $python -m modules.post_install_scan
+    } finally {
+        Pop-Location
+    }
+    if ($LASTEXITCODE -ne 0) { throw 'Quet thiet bi sau cai dat that bai.' }
+
+    $commandsPath = Join-Path $appRoot 'INSTALL-COMMANDS.txt'
+    @(
+        'Cai dat lai:',
+        "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Setup-HBM-LIVECAM.ps1`"",
+        '',
+        'Khoi dong:',
+        "`"$python`" `"$appRoot\run.py`" --execution-provider cuda",
+        '',
+        'Quet lai thiet bi:',
+        "cd /d `"$appRoot`" && `"$python`" -m modules.post_install_scan"
+    ) | Set-Content -LiteralPath $commandsPath -Encoding UTF8
+
+    Write-Step 'Tao loi tat tren Desktop'
+    $cmdContent = @"
+@echo off
+setlocal
+cd /d "%~dp0"
+title HBM-LIVECAM
+
+set "APP_ROOT=%~dp0"
+set "APP_PYTHON=$python"
+set "PATH=%APP_ROOT%bin;%PATH%"
+
+if not exist "%APP_PYTHON%" (
+  echo [HBM-LIVECAM] Khong tim thay Python. Hay cai dat lai.
+  pause
+  exit /b 1
+)
+
+echo [HBM-LIVECAM] Dang quet thiet bi...
+pushd "%APP_ROOT%"
+"%APP_PYTHON%" -m modules.post_install_scan
+popd
+
+echo [HBM-LIVECAM] Dang mo ung dung...
+cd /d "%APP_ROOT%"
+"%APP_PYTHON%" run.py --execution-provider cuda
+if errorlevel 1 (
+  echo.
+  echo [HBM-LIVECAM] Ung dung da dung voi loi %errorlevel%.
+  pause
+  exit /b %errorlevel%
+)
+"@
+    Set-Content -LiteralPath (Join-Path $appRoot 'HBM-LIVECAM.cmd') -Value $cmdContent -Encoding ASCII
     $shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'HBM-LIVECAM.lnk'
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = Join-Path $appRoot 'Run-HBM-LIVECAM.cmd'
+    $shortcut.TargetPath = Join-Path $appRoot 'HBM-LIVECAM.cmd'
     $shortcut.WorkingDirectory = $appRoot
-    $shortcut.Description = 'HBM-LIVECAM CUDA 13'
+    $shortcut.Description = 'HBM-LIVECAM'
     $shortcut.Save()
-    Write-Host ''; Write-Host "Cط·آ£ط¢آ i xong: $shortcutPath" -ForegroundColor Green
+
+    Write-Host "`nCai dat hoan tat: $appRoot" -ForegroundColor Green
+    Write-Host "Bao cao thiet bi: $(Join-Path $appRoot 'device-scan.json')" -ForegroundColor Green
+    Write-Host "Lenh cai dat/khoi dong: $commandsPath" -ForegroundColor Green
+    exit 0
 } catch {
-    Write-Host ''; Write-Host "Cط·آ£ط¢آ i ??t d?ng: $($_.Exception.Message)" -ForegroundColor Red
+    Add-Content -LiteralPath $logPath -Value "FAILED: $($_.Exception.Message)" -Encoding UTF8
+    Write-Host "`nCai dat that bai: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 

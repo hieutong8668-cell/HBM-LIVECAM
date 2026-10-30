@@ -86,6 +86,6 @@ def print_banner() -> None:
     os_label = f"{_platform.system()} {_platform.machine()}"
     print(
         f"[platform] {os_label} | python {sys.version.split()[0]} | "
-        f"accelerator: {accelerator_label()} | providers: {ONNX_PROVIDERS}",
+        f"accelerator: {accelerator_label()} | policy: GPU priority, compatibility fallback enabled",
         flush=True,
     )

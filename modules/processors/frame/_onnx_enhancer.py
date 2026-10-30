@@ -22,6 +22,21 @@ IS_APPLE_SILICON = platform.system() == "Darwin" and platform.machine() == "arm6
 THREAD_SEMAPHORE = threading.Semaphore(min(max(1, (os.cpu_count() or 1)), 8))
 
 
+def strict_cuda_session_options() -> onnxruntime.SessionOptions:
+    """Create a GPU-priority session with minimal CPU scheduling overhead.
+
+    InsightFace contains a small number of shape/normalization nodes that the
+    CUDA EP cannot execute. ONNX Runtime must be allowed to place only those
+    unsupported nodes on its CPU EP; disabling fallback makes Live fail before
+    the camera preview opens.
+    """
+    options = onnxruntime.SessionOptions()
+    options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+    options.intra_op_num_threads = 1
+    options.inter_op_num_threads = 1
+    return options
+
+
 def build_provider_config(providers=None):
     """Wrap raw provider name strings with optimised CUDA / CoreML options.
 
@@ -116,10 +131,7 @@ def create_onnx_session(model_path: str) -> onnxruntime.InferenceSession:
         model_path = optimize_for_coreml(model_path, input_shape=input_shape)
 
     providers = build_provider_config()
-    session_options = onnxruntime.SessionOptions()
-    session_options.graph_optimization_level = (
-        onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
-    )
+    session_options = strict_cuda_session_options()
     session = onnxruntime.InferenceSession(
         model_path, sess_options=session_options, providers=providers,
     )
