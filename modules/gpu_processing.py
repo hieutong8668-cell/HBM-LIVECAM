@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 import cv2
 import numpy as np
-from typing import Tuple
+from typing import List, Tuple
 
 # ---------------------------------------------------------------------------
 # CUDA availability detection (evaluated once at import time)
@@ -47,6 +47,83 @@ if os.environ.get("OPENCV_CUDA_PROCESSING") == "1":
             print("[gpu_processing] OpenCV CUDA processing enabled via OPENCV_CUDA_PROCESSING=1.")
     except Exception:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Device capability detection + auto-configuration (smoothness oriented)
+# ---------------------------------------------------------------------------
+
+GPU_MEMORY_GB: float = 0.0
+GPU_COUNT: int = 1
+GPU_FP16: bool = False
+GPU_HAS_TENSOR_CORES: bool = False
+
+
+def detect_gpu_capabilities() -> dict:
+    """Detect the primary GPU capability set used for auto-configuration.
+
+    Returns a dict with:
+      - cuda:           True when an NVIDIA CUDA GPU is visible to torch.
+      - vram_gb:        Total VRAM of device 0, in GB.
+      - gpu_count:      Number of CUDA devices.
+      - fp16:           True when FP16 inference is supported (Turing+).
+      - tensor_cores: True when the GPU has Tensor Cores (Turing+).
+    """
+    caps = {
+        "cuda": False,
+        "vram_gb": 0.0,
+        "gpu_count": 1,
+        "fp16": False,
+        "tensor_cores": False,
+    }
+    try:
+        import torch
+        if torch.cuda.is_available():
+            caps["cuda"] = True
+            caps["gpu_count"] = max(1, int(torch.cuda.device_count()))
+            props = torch.cuda.get_device_properties(0)
+            caps["vram_gb"] = float(props.total_memory) / float(1024 ** 3)
+            caps["tensor_cores"] = int(getattr(props, "major", 0)) >= 7  # Turing+
+            caps["fp16"] = bool(caps["tensor_cores"])
+    except Exception:
+        pass
+    global GPU_MEMORY_GB, GPU_COUNT, GPU_FP16, GPU_HAS_TENSOR_CORES
+    GPU_MEMORY_GB = float(caps["vram_gb"])
+    GPU_COUNT = int(caps["gpu_count"])
+    GPU_FP16 = bool(caps["fp16"])
+    GPU_HAS_TENSOR_CORES = bool(caps["tensor_cores"])
+    return caps
+
+
+def auto_select_frame_processors() -> List[str]:
+    """Pick the frame processor pipeline tuned to the detected device.
+
+    - No CUDA            -> ["face_swapper"] (swap only, no GPU inference).
+    - CUDA + VRAM >= 6GB -> ["face_swapper", "face_enhancer"] (swap + enhance).
+    - CUDA + low VRAM    -> ["face_swapper"] (swap only, keep VRAM light).
+
+    Users can still override via ``--frame-processor`` or the UI toggles.
+    """
+    caps = detect_gpu_capabilities()
+    if not caps["cuda"]:
+        return ["face_swapper"]
+    if caps["vram_gb"] >= 6.0 or caps["fp16"]:
+        return ["face_swapper", "face_enhancer"]
+    return ["face_swapper"]
+
+
+def auto_select_capture_resolution() -> tuple:
+    """Pick webcam capture resolution tuned to the detected device.
+
+    Higher resolution for smoother previews / better swap quality on capable
+    GPUs; light resolution on weaker GPUs to keep the live loop fast.
+    """
+    caps = detect_gpu_capabilities()
+    if caps["cuda"] and caps["vram_gb"] >= 6.0:
+        return (1280, 720)
+    if caps["cuda"] and caps["vram_gb"] >= 3.0:
+        return (640, 480)
+    return (640, 480)
 
 
 # ---------------------------------------------------------------------------

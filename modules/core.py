@@ -25,6 +25,7 @@ import modules.ui as ui
 from modules.processors.frame.core import get_frame_processors_modules, process_video_in_memory
 from modules.utilities import has_image_extension, is_image, is_video, detect_fps, create_video, extract_frames, get_temp_frame_paths, restore_audio, create_temp, move_temp, clean_temp, normalize_output_path
 from modules.portrait import compose_portrait
+from modules.gpu_processing import auto_select_frame_processors, auto_select_capture_resolution
 
 if HAS_TORCH and 'ROCMExecutionProvider' in modules.globals.execution_providers:
     del torch
@@ -40,7 +41,7 @@ def parse_args() -> None:
     program.add_argument('-s', '--source', help='select an source image', dest='source_path')
     program.add_argument('-t', '--target', help='select an target image or video', dest='target_path')
     program.add_argument('-o', '--output', help='select output file or directory', dest='output_path')
-    program.add_argument('--frame-processor', help='pipeline of frame processors', dest='frame_processor', default=['face_swapper'], choices=['face_swapper', 'face_enhancer', 'face_enhancer_gpen256', 'face_enhancer_gpen512'], nargs='+')
+    program.add_argument('--frame-processor', help='pipeline of frame processors (default: auto-select from device capability)', dest='frame_processor', default=None, choices=['face_swapper', 'face_enhancer', 'face_enhancer_gpen256', 'face_enhancer_gpen512'], nargs='+')
     program.add_argument('--keep-fps', help='keep original fps', dest='keep_fps', action='store_true', default=False)
     program.add_argument('--keep-audio', help='keep original audio', dest='keep_audio', action='store_true', default=True)
     program.add_argument('--keep-frames', help='keep temporary frames', dest='keep_frames', action='store_true', default=False)
@@ -70,7 +71,15 @@ def parse_args() -> None:
     modules.globals.source_path = args.source_path
     modules.globals.target_path = args.target_path
     modules.globals.output_path = normalize_output_path(modules.globals.source_path, modules.globals.target_path, args.output_path)
-    modules.globals.frame_processors = args.frame_processor
+    # Frame processor selection: --frame-processor provided -> manual override.
+    # Not provided -> auto-select tuned to the detected device capability.
+    if args.frame_processor is None:
+        modules.globals.frame_processors = auto_select_frame_processors()
+        modules.globals.auto_mode = True
+        modules.globals.capture_resolution = auto_select_capture_resolution()
+    else:
+        modules.globals.frame_processors = list(args.frame_processor)
+        modules.globals.auto_mode = False
     modules.globals.headless = args.source_path or args.target_path or args.output_path
     modules.globals.keep_fps = args.keep_fps
     modules.globals.keep_audio = args.keep_audio
@@ -97,7 +106,7 @@ def parse_args() -> None:
 
     #for ENHANCER tumblers:
     for enhancer_key in ('face_enhancer', 'face_enhancer_gpen256', 'face_enhancer_gpen512'):
-        modules.globals.fp_ui[enhancer_key] = enhancer_key in args.frame_processor
+        modules.globals.fp_ui[enhancer_key] = enhancer_key in modules.globals.frame_processors
 
     # translate deprecated args
     if args.source_path_deprecated:
@@ -137,16 +146,16 @@ def suggest_max_memory() -> int:
 
 
 def suggest_default_execution_provider() -> str:
-    """Pick the best available provider: cuda > rocm > coreml > openvino > dml > cpu."""
+    """Require CUDA for AI workloads while allowing unsupported graph nodes on CPU."""
     available = encode_execution_providers(onnxruntime.get_available_providers())
-    for pref in ('cuda', 'rocm', 'coreml', 'openvino', 'dml'):
-        if pref in available:
-            return pref
-    return 'cpu'
+    if 'cuda' in available:
+        return 'cuda'
+    return 'cuda'
 
 
 def suggest_execution_providers() -> List[str]:
-    return encode_execution_providers(onnxruntime.get_available_providers())
+    available = encode_execution_providers(onnxruntime.get_available_providers())
+    return ['cuda'] if 'cuda' in available else available
 
 
 def suggest_execution_threads() -> int:
@@ -197,6 +206,9 @@ def pre_check() -> bool:
         return False
     if not shutil.which('ffmpeg'):
         update_status('ffmpeg is not installed.')
+        return False
+    if 'CUDAExecutionProvider' not in onnxruntime.get_available_providers():
+        update_status('CUDAExecutionProvider is required for AI processing.')
         return False
     return True
 
@@ -340,15 +352,14 @@ def run() -> None:
     parse_args()
     if not pre_check():
         return
-    for frame_processor in get_frame_processors_modules(modules.globals.frame_processors):
-        if not frame_processor.pre_check():
-            return
-    # Pre-load face analyser in main thread before GUI starts
-    #from modules.face_analyser import get_face_analyser
-    #get_face_analyser()
     limit_resources()
     if modules.globals.headless:
+        for frame_processor in get_frame_processors_modules(modules.globals.frame_processors):
+            if not frame_processor.pre_check():
+                return
         start()
     else:
+        # Show the UI immediately. Large optional models are downloaded only
+        # when the user starts processing, never before the first window.
         window = ui.init(start, destroy, modules.globals.lang)
         window.mainloop()

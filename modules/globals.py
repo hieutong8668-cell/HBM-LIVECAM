@@ -25,6 +25,7 @@ output_path: str | None = None
 
 # Processing Options
 frame_processors: List[str] = []
+auto_mode: bool = True            # True -> auto-select processor/resolution from device config; False -> manual override
 keep_fps: bool = True
 keep_audio: bool = True
 keep_frames: bool = False
